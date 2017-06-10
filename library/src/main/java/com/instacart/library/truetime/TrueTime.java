@@ -33,6 +33,21 @@ public class TrueTime {
         return new Date(now);
     }
 
+    /**
+     * @return the milliseconds since January 1, 1970, 00:00:00 GMT.
+     */
+    public static long ntpNowInMilliSeconds() {
+        if (!isInitialized()) {
+            throw new IllegalStateException("You need to call init() on TrueTime at least once.");
+        }
+
+        long cachedSntpTime = _getCachedSntpTime();
+        long cachedDeviceUptime = _getCachedDeviceUptime();
+        long deviceUptime = SystemClock.elapsedRealtime();
+
+        return cachedSntpTime + (deviceUptime - cachedDeviceUptime);
+    }
+
     public static boolean isInitialized() {
         return SNTP_CLIENT.wasInitialized() || DISK_CACHE_CLIENT.isTrueTimeCachedFromAPreviousBoot();
     }
