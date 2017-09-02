@@ -18,6 +18,7 @@ import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
 import io.reactivex.FlowableOnSubscribe;
 import io.reactivex.FlowableTransformer;
+import io.reactivex.Observable;
 import io.reactivex.annotations.NonNull;
 import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
@@ -83,12 +84,14 @@ public class TrueTimeRx
      * @return accurate NTP Date
      */
     public Flowable<Date> initializeRx(String ntpPoolAddress) {
-        return initializeNtp(ntpPoolAddress).map(new Function<long[], Date>() {
-            @Override
-            public Date apply(long[] longs) throws Exception {
-                return now();
-            }
-        });
+        return isInitialized()
+                ? Observable.just(now()).toFlowable(BackpressureStrategy.LATEST)
+                : initializeNtp(ntpPoolAddress).map(new Function<long[], Date>() {
+                    @Override
+                    public Date apply(long[] longs) throws Exception {
+                        return now();
+                    }
+                });
      }
 
     /**
