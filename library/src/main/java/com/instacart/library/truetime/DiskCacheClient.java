@@ -26,6 +26,12 @@ class DiskCacheClient {
         cacheInterface.clear();
     }
 
+    void clearCachedInfo(CacheInterface cacheInterface) {
+        if (cacheInterface != null) {
+            cacheInterface.clear();
+        }
+    }
+
     void cacheTrueTimeInfo(SntpClient sntpClient) {
         if (sharedPreferencesUnavailable()) {
             return;

@@ -49,6 +49,10 @@ public class TrueTime {
         DISK_CACHE_CLIENT.clearCachedInfo(context);
     }
 
+    public static void clearCachedInfo(CacheInterface cacheInterface) {
+        DISK_CACHE_CLIENT.clearCachedInfo(cacheInterface);
+    }
+
     public void initialize() throws IOException {
         initialize(_ntpHost);
         saveTrueTimeInfoToDisk();
