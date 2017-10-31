@@ -1,5 +1,18 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.jakewharton.hugo:hugo-plugin:1.2.1'
+    }
+}
+
 apply plugin: 'com.android.library'
+apply plugin: 'com.jakewharton.hugo'
 apply plugin: 'com.github.dcendents.android-maven'
+
+
 
 android {
     compileSdkVersion rootProject.ext.compileSdkVersion
@@ -14,10 +27,16 @@ android {
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
 
     }
+
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+
+        debug {
+            defaultPublishConfig "debug"
         }
     }
 }
@@ -31,4 +50,4 @@ dependencies {
 
 }
 
-group='com.github.instacart'
+group = 'com.github.instacart'
