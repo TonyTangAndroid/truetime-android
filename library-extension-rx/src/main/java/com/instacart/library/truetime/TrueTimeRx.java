@@ -208,9 +208,7 @@ public class TrueTimeRx
                                               o.onNext(requestTime(singleIpHostAddress));
                                               o.onComplete();
                                           } catch (IOException e) {
-                                              if (!o.isCancelled()) {
-                                                  o.onError(e);
-                                              }
+                                              o.tryOnError(e);
                                           }
                                       }
                                   }, BackpressureStrategy.BUFFER)
