@@ -4,6 +4,7 @@ import android.content.Context;
 
 import org.reactivestreams.Publisher;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
@@ -11,10 +12,14 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.Callable;
 
+import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
+import io.reactivex.FlowableEmitter;
+import io.reactivex.FlowableOnSubscribe;
 import io.reactivex.FlowableTransformer;
+import io.reactivex.Observable;
+import io.reactivex.annotations.NonNull;
 import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
 import io.reactivex.functions.Predicate;
@@ -32,13 +37,33 @@ public class TrueTimeRx
         return RX_INSTANCE;
     }
 
-    public TrueTimeRx withSharedPreferences(Context context) {
-        super.withSharedPreferences(context);
+    public TrueTimeRx withSharedPreferencesCache(Context context) {
+        super.withSharedPreferencesCache(context);
+        return this;
+    }
+
+    public TrueTimeRx withCustomizedCacheInterface(CacheInterface cacheInterface) {
+        super.withCustomizedCacheInterface(cacheInterface);
         return this;
     }
 
     public TrueTimeRx withConnectionTimeout(int timeout) {
         super.withConnectionTimeout(timeout);
+        return this;
+    }
+
+    public TrueTimeRx withRootDelayMax(float rootDelay) {
+        super.withRootDelayMax(rootDelay);
+        return this;
+    }
+
+    public TrueTimeRx withRootDispersionMax(float rootDispersion) {
+        super.withRootDispersionMax(rootDispersion);
+        return this;
+    }
+
+    public TrueTimeRx withServerResponseDelayMax(int serverResponseDelayInMillis) {
+        super.withServerResponseDelayMax(serverResponseDelayInMillis);
         return this;
     }
 
@@ -59,12 +84,14 @@ public class TrueTimeRx
      * @return accurate NTP Date
      */
     public Flowable<Date> initializeRx(String ntpPoolAddress) {
-        return initializeNtp(ntpPoolAddress).map(new Function<long[], Date>() {
-            @Override
-            public Date apply(long[] longs) throws Exception {
-                return now();
-            }
-        });
+        return isInitialized()
+                ? Observable.just(now()).toFlowable(BackpressureStrategy.LATEST)
+                : initializeNtp(ntpPoolAddress).map(new Function<long[], Date>() {
+                    @Override
+                    public Date apply(long[] longs) throws Exception {
+                        return now();
+                    }
+                });
      }
 
     /**
@@ -124,7 +151,7 @@ public class TrueTimeRx
                       .filter(new Predicate<List<long[]>>() {
                           @Override
                           public boolean test(List<long[]> longs) throws Exception {
-                              return longs != null && longs.size() > 0;
+                              return longs.size() > 0;
                           }
                       })
                       .map(filterMedianResponse())
@@ -170,15 +197,24 @@ public class TrueTimeRx
                       .flatMap(new Function<String, Flowable<long[]>>() {
                           @Override
                           public Flowable<long[]> apply(final String singleIpHostAddress) {
-                              return Flowable
-                                    .fromCallable(new Callable<long[]>() {
-                                        @Override
-                                        public long[] call() throws Exception {
-                                            TrueLog.d(TAG, "---- requestTime from: " + singleIpHostAddress);
-                                            return requestTime(singleIpHostAddress);
-                                        }
-                                    })
-                                    .subscribeOn(Schedulers.io())
+                              return Flowable.create(new FlowableOnSubscribe<long[]>() {
+                                      @Override
+                                      public void subscribe(@NonNull FlowableEmitter<long[]> o)
+                                          throws Exception {
+
+                                          TrueLog.d(TAG,
+                                              "---- requestTime from: " + singleIpHostAddress);
+                                          try {
+                                              o.onNext(requestTime(singleIpHostAddress));
+                                              o.onComplete();
+                                          } catch (IOException e) {
+                                              if (!o.isCancelled()) {
+                                                  o.onError(e);
+                                              }
+                                          }
+                                      }
+                                  }, BackpressureStrategy.BUFFER)
+                                      .subscribeOn(Schedulers.io())
                                     .doOnError(new Consumer<Throwable>() {
                                         @Override
                                         public void accept(Throwable throwable) {
@@ -190,7 +226,6 @@ public class TrueTimeRx
                       })
                       .toList()
                       .toFlowable()
-                      .onErrorResumeNext(Flowable.<List<long[]>>empty())
                       .map(filterLeastRoundTripDelay()); // pick best response for each ip
             }
         };

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.SystemClock;
 import java.io.IOException;
 import java.util.Date;
+import java.util.Locale;
 
 public class TrueTime {
 
@@ -13,6 +14,9 @@ public class TrueTime {
     private static final DiskCacheClient DISK_CACHE_CLIENT = new DiskCacheClient();
     private static final SntpClient SNTP_CLIENT = new SntpClient();
 
+    private static float _rootDelayMax = 100;
+    private static float _rootDispersionMax = 100;
+    private static int _serverResponseDelayMax = 200;
     private static int _udpSocketTimeoutInMillis = 30_000;
 
     private String _ntpHost = "1.us.pool.ntp.org";
@@ -60,6 +64,10 @@ public class TrueTime {
         DISK_CACHE_CLIENT.clearCachedInfo(context);
     }
 
+    public static void clearCachedInfo(CacheInterface cacheInterface) {
+        DISK_CACHE_CLIENT.clearCachedInfo(cacheInterface);
+    }
+
     public void initialize() throws IOException {
         initialize(_ntpHost);
         saveTrueTimeInfoToDisk();
@@ -69,13 +77,50 @@ public class TrueTime {
      * Cache TrueTime initialization information in SharedPreferences
      * This can help avoid additional TrueTime initialization on app kills
      */
-    public synchronized TrueTime withSharedPreferences(Context context) {
-        DISK_CACHE_CLIENT.enableDiskCaching(context);
+    public synchronized TrueTime withSharedPreferencesCache(Context context) {
+        DISK_CACHE_CLIENT.enableSharedPreferenceCaching(context);
+        return INSTANCE;
+    }
+
+    /**
+     * Customized TrueTime Cache implementation.
+     */
+    public synchronized TrueTime withCustomizedCacheInterface(CacheInterface cacheInterface) {
+        DISK_CACHE_CLIENT.enableCacheInterface(cacheInterface);
         return INSTANCE;
     }
 
     public synchronized TrueTime withConnectionTimeout(int timeoutInMillis) {
         _udpSocketTimeoutInMillis = timeoutInMillis;
+        return INSTANCE;
+    }
+
+    public synchronized TrueTime withRootDelayMax(float rootDelayMax) {
+        if (rootDelayMax > _rootDelayMax) {
+          String log = String.format(Locale.getDefault(),
+              "The recommended max rootDelay value is %f. You are setting it at %f",
+              _rootDelayMax, rootDelayMax);
+          TrueLog.w(TAG, log);
+        }
+
+        _rootDelayMax = rootDelayMax;
+        return INSTANCE;
+    }
+
+    public synchronized TrueTime withRootDispersionMax(float rootDispersionMax) {
+      if (rootDispersionMax > _rootDispersionMax) {
+        String log = String.format(Locale.getDefault(),
+            "The recommended max rootDispersion value is %f. You are setting it at %f",
+            _rootDispersionMax, rootDispersionMax);
+        TrueLog.w(TAG, log);
+      }
+
+      _rootDispersionMax = rootDispersionMax;
+      return INSTANCE;
+    }
+
+    public synchronized TrueTime withServerResponseDelayMax(int serverResponseDelayInMillis) {
+        _serverResponseDelayMax = serverResponseDelayInMillis;
         return INSTANCE;
     }
 
@@ -101,7 +146,11 @@ public class TrueTime {
     }
 
     long[] requestTime(String ntpHost) throws IOException {
-        return SNTP_CLIENT.requestTime(ntpHost, _udpSocketTimeoutInMillis);
+        return SNTP_CLIENT.requestTime(ntpHost,
+            _rootDelayMax,
+            _rootDispersionMax,
+            _serverResponseDelayMax,
+            _udpSocketTimeoutInMillis);
     }
 
     synchronized static void saveTrueTimeInfoToDisk() {
