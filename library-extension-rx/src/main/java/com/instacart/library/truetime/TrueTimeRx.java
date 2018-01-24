@@ -32,6 +32,7 @@ public class TrueTimeRx
     private static final String TAG = TrueTimeRx.class.getSimpleName();
 
     private int _retryCount = 50;
+    private int _repeatCount = 5;
 
     public static TrueTimeRx build() {
         return RX_INSTANCE;
@@ -74,6 +75,14 @@ public class TrueTimeRx
 
     public TrueTimeRx withRetryCount(int retryCount) {
         _retryCount = retryCount;
+        return this;
+    }
+
+    public TrueTimeRx withRepeatCount(int repeatCount) {
+        if (repeatCount<=0){
+            throw new IllegalArgumentException();
+        }
+        _repeatCount = repeatCount;
         return this;
     }
 
@@ -144,8 +153,8 @@ public class TrueTimeRx
                               return inetAddress.getHostAddress();
                           }
                       })
-                      .flatMap(bestResponseAgainstSingleIp(5))  // get best response from querying the ip 5 times
-                      .take(5)                                  // take 5 of the best results
+                      .flatMap(bestResponseAgainstSingleIp(_repeatCount))  // get best response from querying the ip 5 times
+                      .take(_repeatCount)                                  // take 5 of the best results
                       .toList()
                       .toFlowable()
                       .filter(new Predicate<List<long[]>>() {
